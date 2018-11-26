@@ -38,20 +38,29 @@ func handler(w http.ResponseWriter, r *http.Request) {
 }
 
 type AwSignallingPacket struct {
-	SignallingType string      `json:"signallingType"` // ("register" | "relay" | "peerlist")
-	SignallingData interface{} `json:"signallingData"` // PeerId | PeerList | AwRelayData;
+	SignallingType string `json:"signallingType"` // ("register" | "relay" | "peerlist" | "close")
+	SignallingData string `json:"signallingData"` // PeerId | PeerList | AwRelayData;
 }
 
 type AwRelaySignallingData struct {
-	peerId string
-	data   string
+	PeerId string `json:"peerId"`
+	Data   string `json:"data"`
 }
 
 func (connection *AwConnection) serve() {
 	for {
 		messageType, receivedJSONmessage, err := connection.conn.ReadMessage()
 		if err != nil {
-			log.Println(err)
+			log.Println("err", err)
+			peerId := findPeerIdForConnection(connection)
+			deregister(peerId)
+			outgoingSignallingPacket := AwSignallingPacket{
+				SignallingType: "close",
+				SignallingData: peerId,
+			}
+			log.Println("outgoingSignallingPacket", outgoingSignallingPacket)
+			message, _ := json.Marshal(outgoingSignallingPacket)
+			broadcast(message)
 			return
 		}
 		if messageType != websocket.TextMessage {
@@ -71,33 +80,51 @@ func (connection *AwConnection) serve() {
 
 		switch signallingPacket.SignallingType {
 		case "register":
-			log.Println("registering")
-			connection.register(signallingPacket.SignallingData.(string))
+			log.Println("registering user", string(signallingPacket.SignallingData))
+
+			var peerId string
+			err2 := json.Unmarshal([]byte(signallingPacket.SignallingData), &peerId)
+			if err2 != nil {
+				log.Println(err2)
+				return
+			}
+			log.Println("peerid", peerId)
+			connection.register(peerId)
 			peerList := getPeerIds()
+			peerListJSON, _ := json.Marshal(peerList)
 			outgoingSignallingPacket := AwSignallingPacket{
 				SignallingType: "peerlist",
-				SignallingData: peerList,
+				SignallingData: string(peerListJSON),
 			}
 			log.Println("outgoingSignallingPacket", outgoingSignallingPacket)
 			message, _ := json.Marshal(outgoingSignallingPacket)
 			connection.sendMessage(message)
 		case "relay":
 			log.Println("relaying")
-			SignallingData := signallingPacket.SignallingData.(AwRelaySignallingData)
-			targetPeerId := SignallingData.peerId
+
+			signallingData := AwRelaySignallingData{}
+			err2 := json.Unmarshal([]byte(signallingPacket.SignallingData), &signallingData)
+			if err2 != nil {
+				log.Println(err2)
+				return
+			}
+
+			targetPeerId := signallingData.PeerId
 			targetPeerConnection := findConnectionByPeerId(targetPeerId)
 			sourcePeerId := findPeerIdForConnection(connection)
-			relayData := SignallingData.data
+			relayData := signallingData.Data
 			log.Println("targetPeerId", targetPeerId)
 			log.Println("targetPeerConnection", targetPeerConnection)
 			log.Println("sourcePeerId", sourcePeerId)
 			log.Println("relayData", relayData)
+			outgoingSingnallingData := AwRelaySignallingData{
+				PeerId: sourcePeerId,
+				Data:   relayData,
+			}
+			outgoingSingnallingDataJSON, _ := json.Marshal(outgoingSingnallingData)
 			outgoingSignallingPacket := AwSignallingPacket{
 				SignallingType: "relay",
-				SignallingData: AwRelaySignallingData{
-					peerId: sourcePeerId,
-					data:   relayData,
-				},
+				SignallingData: string(outgoingSingnallingDataJSON),
 			}
 			log.Println("outgoingSignallingPacket", outgoingSignallingPacket)
 			message, _ := json.Marshal(outgoingSignallingPacket)
@@ -128,9 +155,19 @@ func findConnectionByPeerId(peerId string) *AwConnection {
 	return connections[peerId]
 }
 
+func broadcast(message []byte) {
+	for _, peerConnection := range connections {
+		peerConnection.sendMessage(message)
+	}
+}
+
 func (connection *AwConnection) register(peerId string) {
 	log.Println("registering peerId ", peerId)
 	connections[peerId] = connection
+}
+
+func deregister(peerId string) {
+	delete(connections, peerId)
 }
 
 func (connection *AwConnection) sendMessage(message []byte) {
