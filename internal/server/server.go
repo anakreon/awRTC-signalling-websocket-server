@@ -4,17 +4,14 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/anakreon/awrtc-signalling-websocket-server/internal/awconnections"
 	"github.com/gorilla/websocket"
 )
 
-type ConnectionHandler interface {
-	Handle(connection *websocket.Conn)
-}
-
 type WebsocketServer struct {
-	upgrader websocket.Upgrader
-	Handler  ConnectionHandler
-	Port     string
+	upgrader      websocket.Upgrader
+	AwConnections *awconnections.AwConnections
+	Port          string
 }
 
 func (server *WebsocketServer) Serve() {
@@ -34,10 +31,14 @@ func (server *WebsocketServer) initializeWebsocketUpgrader() {
 }
 
 func (server *WebsocketServer) websocketHandler(writer http.ResponseWriter, request *http.Request) {
-	connection, err := server.upgrader.Upgrade(writer, request, nil)
+	conn, err := server.upgrader.Upgrade(writer, request, nil)
+	awConnection := awconnections.AwConnection{
+		AwConnections: server.AwConnections,
+	}
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	server.Handler.Handle(connection)
+
+	awConnection.Handle(conn)
 }

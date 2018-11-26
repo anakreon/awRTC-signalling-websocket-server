@@ -7,12 +7,9 @@ import (
 
 func main() {
 	awConnections := make(awconnections.AwConnections)
-	awConnection := awconnections.AwConnection{
-		AwConnections: &awConnections,
-	}
 	server := server.WebsocketServer{
-		Handler: &awConnection,
-		Port:    ":8080",
+		AwConnections: &awConnections,
+		Port:          ":8080",
 	}
 	server.Serve()
 }
