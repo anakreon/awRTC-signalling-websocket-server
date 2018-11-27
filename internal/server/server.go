@@ -4,14 +4,14 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/anakreon/awrtc-signalling-websocket-server/internal/awconnections"
+	"github.com/anakreon/awrtc-signalling-websocket-server/internal/peers"
 	"github.com/gorilla/websocket"
 )
 
 type WebsocketServer struct {
-	upgrader      websocket.Upgrader
-	AwConnections *awconnections.AwConnections
-	Port          string
+	upgrader websocket.Upgrader
+	Peerlist *peers.Peerlist
+	Port     string
 }
 
 func (server *WebsocketServer) Serve() {
@@ -32,13 +32,13 @@ func (server *WebsocketServer) initializeWebsocketUpgrader() {
 
 func (server *WebsocketServer) websocketHandler(writer http.ResponseWriter, request *http.Request) {
 	conn, err := server.upgrader.Upgrade(writer, request, nil)
-	awConnection := awconnections.AwConnection{
-		AwConnections: server.AwConnections,
+	peer := peers.Peer{
+		Peerlist: server.Peerlist,
 	}
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
-	awConnection.Handle(conn)
+	peer.Handle(conn)
 }
