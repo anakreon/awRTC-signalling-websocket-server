@@ -4,7 +4,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/anakreon/awrtc-signalling-websocket-server/internal/peers"
+	"github.com/anakreon/awRTC-signalling-websocket-server/internal/peers"
 	"github.com/gorilla/websocket"
 )
 
