@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/anakreon/awrtc-signalling-websocket-server/internal/peers"
-	"github.com/anakreon/awrtc-signalling-websocket-server/internal/server"
+	"github.com/anakreon/awRTC-signalling-websocket-server/internal/peers"
+	"github.com/anakreon/awRTC-signalling-websocket-server/internal/server"
 )
 
 func main() {
